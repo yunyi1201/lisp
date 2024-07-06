@@ -10,18 +10,7 @@ import functools
 import re
 
 
-sys.setrecursionlimit(20_000)
-
-# KEEP THE ABOVE LINES INTACT, BUT REPLACE THIS COMMENT WITH YOUR lab.py FROM
-# THE PREVIOUS LAB, WHICH SHOULD BE THE STARTING POINT FOR THIS LAB.
-
-# import operator
-# import math
-
-sys.setrecursionlimit(20_000)
-
-# NO ADDITIONAL IMPORTS!
-
+# sys.setrecursionlimit(20_000)
 #############################
 # Scheme-related Exceptions #
 #############################
@@ -637,9 +626,9 @@ def do_if_form(expression, env):
     # e.g (if (equal? 1 n) n m)
     validate_form(expression, 2, 3)
     if is_scheme_true(evaluate(expression[0], env)):
-        return evaluate(expression[1], env)
+        return evaluate(expression[1], env, tail=True)
     elif len(expression) == 3:
-        return evaluate(expression[2], env)
+        return evaluate(expression[2], env, tail=True)
 
 
 def do_and_form(expression, env):
@@ -806,7 +795,7 @@ class BuiltinProcedure(Procedure):
         self.need_env = need_env
 
     def __str__(self):
-        return f"#[{self.name}]"
+        return f"BuiltinProcedure#[{self.name}]"
 
 
 class LambdaProcedure(Procedure):
@@ -945,7 +934,6 @@ def evaluate_file(f_name, env=None):
         return evaluate(parse(tokenize(text)), env)
 
 
-# @trace
 def evaluate(tree, env=None):
     """
     Evaluate the given syntax tree according to the rules of the Scheme
@@ -1010,9 +998,51 @@ def apply(procedure, args, env):
                 f"arguments numbers if not correct: {args}, but function formal argument is: {procedure.formals}"
             )
         make_function_frame(procedure.formals, args, env, func_frame)
-        return evaluate(procedure.body, func_frame)
+        return evaluate(procedure.body, func_frame, tail=True)
     else:
         assert False, "Unexpected procedure: {}".format(procedure)
+
+
+###################
+# tail recursion #
+###################
+
+
+class Unevaluate:
+    """
+    An expression and an environment in which it is to be evaluated.
+    """
+
+    def __init__(self, expr, env):
+        """
+        Expression expr to be evaluated in frame env.
+        """
+        self.expr = expr
+        self.env = env
+
+
+def optimize_tail_calls(unoptimized_scheme_eval):
+    """
+    Return a properly tail recursive version of an eval function.
+    """
+
+    def optimized_eval(expr, env, tail=False):
+        """
+        Evaluate Scheme expression expr in Frame env. If tail, return an Unevaluated containing an expression for further
+        evaluate.
+        """
+        if tail and not scheme_symbolp(expr) and not self_evaluating(expr):
+            return Unevaluate(expr, env)
+
+        result = Unevaluate(expr, env)
+        while isinstance(result, Unevaluate):
+            result = unoptimized_scheme_eval(result.expr, result.env)
+        return result
+
+    return optimized_eval
+
+
+evaluate = optimize_tail_calls(evaluate)
 
 
 if __name__ == "__main__":
